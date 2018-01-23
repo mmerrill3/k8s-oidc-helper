@@ -1,15 +1,15 @@
 package helper
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
-
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type ConfigFile struct {
@@ -24,7 +24,7 @@ type GoogleConfig struct {
 type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	IdToken      string `json:"id_token"`
+	IdToken      string `json:"id_token,omitempty"`
 }
 
 func ReadConfig(path string) (*GoogleConfig, error) {
@@ -55,6 +55,29 @@ func GetToken(clientID, clientSecret, code string) (*TokenResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	tr := &TokenResponse{}
+	err = json.NewDecoder(resp.Body).Decode(tr)
+	if err != nil {
+		return nil, err
+	}
+	return tr, nil
+}
+
+// Get the id_token from the oauth2-proxy's cookie
+func GetTokenFromCookie(cookie, cookieURL string) (*TokenResponse, error) {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: transport}
+	req, _ := http.NewRequest("GET", cookieURL, nil)
+	fmt.Printf("Using cookie URL %s\n", cookieURL)
+	req.Header.Set("cookie", "_oauth2_proxy="+cookie)
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("Error while sending GET to oauth2_proxy %s\n", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
 	tr := &TokenResponse{}
 	err = json.NewDecoder(resp.Body).Decode(tr)
 	if err != nil {
