@@ -86,6 +86,15 @@ func GetTokenFromCookie(cookie, cookieURL string) (*TokenResponse, error) {
 	return tr, nil
 }
 
+func GetTokenFromAuth(auth string) (*TokenResponse, error) {
+    tr := &TokenResponse{}
+    err := json.Unmarshal([]byte(auth), tr)
+	if err != nil {
+		return nil, err
+	}
+    return tr, nil
+}
+
 type KubectlUser struct {
 	Name         string        `yaml:"name"`
 	KubeUserInfo *KubeUserInfo `yaml:"user"`
@@ -146,8 +155,7 @@ func GenerateAuthInfo(clientId, clientSecret, idToken, refreshToken string) *cli
 	}
 }
 
-func createOpenCmd(oauthUrl, clientID string) (*exec.Cmd, error) {
-	url := fmt.Sprintf(oauthUrl, clientID)
+func createOpenCmd(url string) (*exec.Cmd, error) {
 
 	switch os := runtime.GOOS; os {
 	case "darwin":
@@ -160,14 +168,15 @@ func createOpenCmd(oauthUrl, clientID string) (*exec.Cmd, error) {
 }
 
 func LaunchBrowser(openBrowser bool, oauthUrl, clientID string) {
-	openInstructions := fmt.Sprintf("Open this url in your browser: %s\n", fmt.Sprintf(oauthUrl, clientID))
+    url := fmt.Sprintf(oauthUrl, clientID)
+	openInstructions := fmt.Sprintf("Open this url in your browser: %s\n", url)
 
 	if !openBrowser {
 		fmt.Print(openInstructions)
 		return
 	}
 
-	cmd, err := createOpenCmd(oauthUrl, clientID)
+	cmd, err := createOpenCmd(url)
 	if err != nil {
 		fmt.Print(openInstructions)
 		return
@@ -177,4 +186,30 @@ func LaunchBrowser(openBrowser bool, oauthUrl, clientID string) {
 	if err != nil {
 		fmt.Print(openInstructions)
 	}
+}
+
+func SetSTTY() {
+    fmt.Print("setting stty -icanon")
+    cmd := exec.Command("stty", "-icanon")
+    out, err := cmd.CombinedOutput()
+    if err != nil {
+        fmt.Printf("cmd.Run() failed with %s\n", err)
+    }
+    fmt.Printf("combined out:\n%s\n", string(out))
+}
+
+func LaunchBrowserToCopyCookie(openBrowser bool, oauthUrl, clientID string) {
+	openInstructions := fmt.Sprintf("Open this url in your browser: %s\n", fmt.Sprintf(oauthUrl, clientID))
+    oauthUrl="https://dashboard.k8s.ctnrva0.dev.vonagenetworks.net/exchangeCookie"
+
+    cmd, err := createOpenCmd(oauthUrl)
+    if err != nil {
+        fmt.Print(openInstructions)
+        return
+    }
+
+    err = cmd.Start()
+    if err != nil {
+        fmt.Print(openInstructions)
+    }
 }
